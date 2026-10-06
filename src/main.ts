@@ -1,21 +1,33 @@
 import ContractDatabaseRepository from "./infra/repository/ContractDatabaseRepository";
+import InvoiceDatabaseRepository from "./infra/repository/InvoiceDatabaseRepository";
 import ExpressAdapter from "./infra/http/ExpressAdapter";
 import GenerateInvoices from "./application/usecase/GenerateInvoices";
-import JsonPresenter from "./infra/presenter/JsonPresenter";
+import CloseInvoicing from "./application/usecase/CloseInvoicing";
+import GetInvoices from "./application/usecase/GetInvoices";
+import PresenterFactory from "./infra/presenter/PresenterFactory";
 import LoggerDecorator from "./application/decorator/LoggerDecorator";
 import MainController from "./infra/http/MainController";
+import InvoiceController from "./infra/http/InvoiceController";
 import PgPromiseAdapter from "./infra/database/PgPromiseAdapter";
 import Mediator from "./infra/mediator/Mediator";
 import SendEmail from "./application/usecase/SendEmail";
 
 const connection = new PgPromiseAdapter();
 const contractRepository = new ContractDatabaseRepository(connection);
+const invoiceRepository = new InvoiceDatabaseRepository(connection);
+const presenterFactory = new PresenterFactory();
 const mediator = new Mediator();
 const sendEmail = new SendEmail();
 mediator.on("InvoicesGenerated", async function (data: any) {
 	await sendEmail.execute(data);
 });
-const generateInvoices = new LoggerDecorator(new GenerateInvoices(contractRepository, new JsonPresenter(), mediator));
+mediator.on("InvoicesClosed", async function (data: any) {
+	await sendEmail.execute(data);
+});
+const generateInvoices = new LoggerDecorator(new GenerateInvoices(contractRepository, presenterFactory, mediator));
+const closeInvoicing = new LoggerDecorator(new CloseInvoicing(contractRepository, invoiceRepository, presenterFactory, mediator));
+const getInvoices = new GetInvoices(invoiceRepository, presenterFactory);
 const httpServer = new ExpressAdapter();
 new MainController(httpServer, generateInvoices);
+new InvoiceController(httpServer, closeInvoicing, getInvoices);
 httpServer.listen(3000);

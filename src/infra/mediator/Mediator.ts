@@ -1,4 +1,6 @@
-export default class Mediator {
+import Mediator from "../../application/mediator/Mediator";
+
+export default class DefaultMediator implements Mediator {
 	observers: { event: string, callback: Function }[];
 
 	constructor () {
